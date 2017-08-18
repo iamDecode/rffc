@@ -1,4 +1,13 @@
-"getLocalIncrements" <-function(object, dataT, binAsReg=TRUE, mcls=NULL)
+getLocalIncrements <- function(object, dataT, binAsReg=TRUE, mcls=NULL) {
+	browser()
+	if (is(object, "randomForest")) {
+		getLocalIncrements.randomForest(object, dataT, binAsReg, mcls)
+	} else {
+	  getLocalIncrements.tree(object, dataT, binAsReg, mcls)
+	}
+}
+
+getLocalIncrements.randomForest <-function(object, dataT, binAsReg=TRUE, mcls=NULL)
 {
   #test model object
    if (!inherits(object, "randomForest")) stop("getLcalIncrements(): Object is not of class randomForest")
@@ -227,3 +236,70 @@
 	}
 }
 
+getLocalIncrements.tree <-function(tree, dataT, y, binAsReg=TRUE, mcls=NULL)
+{
+	print("tree")
+  #test model object
+  if (!inherits(object, "data.frame")) stop("getLcalIncrements(): Object is not of class data.frame")
+
+  #vars
+  #	forest<-object$forest
+  #	inbag<-object$inbag
+  	mdim <- ncol(x)
+  	ntest <- nrow(x)
+  #	ntree <- object$forest$ntree
+  #	maxcat <- max(object$forest$ncat)
+  #	nrnodes <- object$forest$nrnodes
+  
+	x.col.names <- if (is.null(colnames(x))) 1:ncol(x) else colnames(x)
+	x.row.names <- rownames(x)
+    x <- t(data.matrix(x))
+    
+    
+		## Ensure storage mode is what is expected in C.
+		if (! is.integer(tree$leftDaughter))
+			storage.mode(tree$leftDaughter) <- "integer"
+		if (! is.integer(tree$rightDaughter))
+			storage.mode(tree$rightDaughter) <- "integer"
+		if (! is.integer(tree$status))
+			storage.mode(tree$status) <- "integer"
+		#if (! is.double(object$forest$xbestsplit))
+		# 	storage.mode(object$forest$xbestsplit) <- "double"
+		#if (! is.double(object$forest$nodepred))
+		#   storage.mode(object$forest$nodepred) <- "double"
+		if (! is.factor(tree$`split var`))
+		   storage.mode(tree$`split var`) <- "factor"
+    if (! is.double(tree$`split point`))
+      storage.mode(tree$`split point`) <- "double"
+		#if (! is.integer(object$forest$ndbigtree))
+		#   storage.mode(object$forest$ndbigtree) <- "integer"
+		#if (! is.integer(object$forest$ncat))
+		#   storage.mode(object$forest$ncat) <- "integer"
+		#if (! is.integer(inbag))
+		#   storage.mode(inbag) <- "integer"
+	  # if (! is.double(object$y))
+		#   storage.mode(object$y) <- "double"
+
+		ans<-.C("tlIncrementClass",
+		 as.double(x),
+		 y,
+		 as.integer(mdim),
+		 as.integer(ntest),
+		 tree$leftDaughter,
+		 tree$rightDaughter,
+		 tree$status,
+		 tree$`split point`,
+		 tree$`split var`,
+		 NROW(tree), #only one!
+		 object$forest$ncat,
+		 inbag,
+		 localIncrements=as.double(flocalIncrementsClass),
+		 rootMeans=as.double(frootMeans),
+		 length(object$classes), 
+		 PACKAGE = "rfFC")
+		 
+	  
+	  out<-list(type="class", forest=list(lIncrements=ans$localIncrements, rmv=ans$rootMeans))
+	  return(out)
+	}
+}
